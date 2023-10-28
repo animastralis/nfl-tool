@@ -49,10 +49,6 @@ func GetTeams() []Team {
 	return teams
 }
 
-func GetDataFromApi(s string) {
-	panic("unimplemented")
-}
-
 func GetTeamRecord(id string) *TeamRecord {
 	url := fmt.Sprintf("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/types/2/teams/%s/record", id)
 	result := util.GetApiData(url)
