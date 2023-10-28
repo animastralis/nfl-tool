@@ -1,9 +1,7 @@
 package team
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/animastralis/nfl-tool/util"
 )
@@ -23,30 +21,12 @@ type TeamRecord struct {
 	Value   float64 // 0.123456789
 }
 
-func httpGet(url string) map[string]interface{} {
-	resp, err := http.Get(url)
-	if err != nil {
-		util.PrintError(err)
-		return nil
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		util.PrintError(err)
-		return nil
-	}
-
-	return result
-}
-
 func GetTeams() []Team {
 	const teamsBaseUrl = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/teams"
 	const teamRequestLimit = 50
 
 	// Get Team Links
-	result := httpGet(fmt.Sprintf("%s?limit=%d", teamsBaseUrl, teamRequestLimit))
+	result := util.GetApiData(fmt.Sprintf("%s?limit=%d", teamsBaseUrl, teamRequestLimit))
 
 	var teamLinks []string
 	for _, linkMap := range result["items"].([]interface{}) {
@@ -56,7 +36,7 @@ func GetTeams() []Team {
 	// Get Teams
 	var teams []Team
 	for _, link := range teamLinks {
-		result = httpGet(link)
+		result = util.GetApiData(link)
 
 		var team Team
 		team.Id = result["id"].(string)
@@ -69,9 +49,13 @@ func GetTeams() []Team {
 	return teams
 }
 
+func GetDataFromApi(s string) {
+	panic("unimplemented")
+}
+
 func GetTeamRecord(id string) *TeamRecord {
 	url := fmt.Sprintf("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/types/2/teams/%s/record", id)
-	result := httpGet(url)
+	result := util.GetApiData(url)
 
 	items := result["items"].([]interface{})
 	var tr TeamRecord
