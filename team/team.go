@@ -11,7 +11,8 @@ type Team struct {
 	FullName     string `json:"displayName"`
 	Name         string `json:"nickname"`
 	Abbreviation string `json:"abbreviation"`
-	TeamRecord   TeamRecord
+	Record       TeamRecord
+	Schedule     TeamSchedule
 }
 
 type TeamRecord struct {
@@ -21,7 +22,10 @@ type TeamRecord struct {
 	Value   float64 // 0.123456789
 }
 
-func GetTeams() []Team {
+type TeamSchedule struct {
+}
+
+func initTeams() *[]Team {
 	const teamsBaseUrl = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/teams"
 	const teamRequestLimit = 50
 
@@ -46,11 +50,11 @@ func GetTeams() []Team {
 		teams = append(teams, team)
 	}
 
-	return teams
+	return &teams
 }
 
-func GetTeamRecord(id string) *TeamRecord {
-	url := fmt.Sprintf("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/types/2/teams/%s/record", id)
+func (t *Team) fetchTeamRecord() {
+	url := fmt.Sprintf("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/types/2/teams/%s/record", t.Id)
 	result := util.GetApiData(url)
 
 	items := result["items"].([]interface{})
@@ -69,5 +73,5 @@ func GetTeamRecord(id string) *TeamRecord {
 		}
 	}
 
-	return &tr
+	t.Record = tr
 }
