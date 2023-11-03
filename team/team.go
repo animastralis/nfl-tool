@@ -1,17 +1,21 @@
 package team
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/animastralis/nfl-tool/util"
 )
 
+const NUM_TEAMS = 32
+const TEAM_URL_BASE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
+
 type Team struct {
 	Id           string `json:"id"`
 	FullName     string `json:"displayName"`
-	Name         string `json:"nickname"`
+	Name         string `json:"name"`
 	Abbreviation string `json:"abbreviation"`
-	Record       TeamRecord
+	Record       string
 	Schedule     TeamSchedule
 }
 
@@ -22,56 +26,74 @@ type TeamRecord struct {
 	Value   float64 // 0.123456789
 }
 
-type TeamSchedule struct {
+type TeamGame struct {
+	Week       uint8
+	OpponentId string
+	HasWinner  bool
+	Winner     bool
 }
 
-func initTeams() *[]Team {
-	const teamsBaseUrl = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/teams"
-	const teamRequestLimit = 50
+type TeamSchedule struct {
+	Games []TeamGame
+}
 
-	// Get Team Links
-	result := util.GetApiData(fmt.Sprintf("%s?limit=%d", teamsBaseUrl, teamRequestLimit))
+func initTeams() *map[string]Team {
+	teams := make(map[string]Team)
+	result := util.GetApiData(TEAM_URL_BASE)
+	sports := result["sports"].([]interface{})
+	leagues := sports[0].(map[string]interface{})["leagues"].([]interface{})
+	teamsData := leagues[0].(map[string]interface{})["teams"].([]interface{})
 
-	var teamLinks []string
-	for _, linkMap := range result["items"].([]interface{}) {
-		teamLinks = append(teamLinks, linkMap.(map[string]interface{})["$ref"].(string))
+	for _, teamData := range teamsData {
+		teamString, _ := json.Marshal(teamData.(map[string]interface{})["team"].(map[string]interface{}))
+		var t Team
+		if err := json.Unmarshal(teamString, &t); err != nil {
+			fmt.Println(err)
+		}
+
+		teams[t.Id] = t
 	}
 
-	// Get Teams
-	var teams []Team
-	for _, link := range teamLinks {
-		result = util.GetApiData(link)
-
-		var team Team
-		team.Id = result["id"].(string)
-		team.FullName = result["displayName"].(string)
-		team.Name = result["nickname"].(string)
-		team.Abbreviation = result["abbreviation"].(string)
-		teams = append(teams, team)
+	for id := range teams {
+		t := teams[id]
+		t.Record, t.Schedule = t.generateSchedule()
+		teams[id] = t
 	}
 
 	return &teams
 }
 
-func (t *Team) fetchTeamRecord() {
-	url := fmt.Sprintf("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2023/types/2/teams/%s/record", t.Id)
+func (t Team) generateSchedule() (string, TeamSchedule) {
+	url := fmt.Sprintf("%s/%v/schedule", TEAM_URL_BASE, t.Id)
 	result := util.GetApiData(url)
 
-	items := result["items"].([]interface{})
-	var tr TeamRecord
+	// Set Team Record
+	team := result["team"].(map[string]interface{})
+	record := team["recordSummary"].(string)
 
-	for k, v := range items[0].(map[string]interface{}) {
-		switch k {
-		case "name":
-			tr.Name = v.(string)
-		case "type":
-			tr.Type = v.(string)
-		case "summary":
-			tr.Summary = v.(string)
-		case "value":
-			tr.Value = v.(float64)
+	// Parse schedule
+	var ts TeamSchedule
+	events := result["events"].([]interface{})
+	for _, event := range events {
+		var tg TeamGame
+		tg.Week = uint8(event.(map[string]interface{})["week"].(map[string]any)["number"].(float64))
+
+		competition := event.(map[string]interface{})["competitions"].([]interface{})[0].(map[string]interface{})
+		competitors := competition["competitors"].([]interface{})
+		for _, c := range competitors {
+			competitorId := c.(map[string]interface{})["id"].(string)
+			if competitorId == t.Id {
+				if c.(map[string]interface{})["winner"] != nil {
+					tg.HasWinner = true
+					tg.Winner = c.(map[string]interface{})["winner"].(bool)
+				} else {
+					tg.HasWinner = false
+				}
+			} else {
+				tg.OpponentId = competitorId
+			}
 		}
+		ts.Games = append(ts.Games, tg)
 	}
-
-	t.Record = tr
+	return record, ts
 }

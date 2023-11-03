@@ -5,7 +5,7 @@ import (
 )
 
 type TeamManager struct {
-	Teams []Team
+	Teams map[string]Team
 }
 
 func InitTeamManager() *TeamManager {
@@ -16,15 +16,11 @@ func InitTeamManager() *TeamManager {
 
 func (tm *TeamManager) InitTeams() {
 	teams := initTeams()
-	for k, _ := range *teams {
-		(*teams)[k].fetchTeamRecord()
-	}
-
 	tm.Teams = *teams
 }
 
 func (tm *TeamManager) PrintTeams() {
 	for _, team := range tm.Teams {
-		fmt.Println(team.Record)
+		fmt.Println(team)
 	}
 }
